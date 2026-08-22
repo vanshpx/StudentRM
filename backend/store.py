@@ -147,6 +147,26 @@ def get_active_students() -> list[dict]:
     return result
 
 
+def get_students_as_df() -> "pd.DataFrame":
+    """
+    Export the current batch's students back as a raw DataFrame
+    (in the same column shape as a freshly-read CSV) so that
+    append mode can concatenate old + new data before re-cleaning.
+    """
+    import pandas as pd
+    with _get_conn() as conn:
+        rows = conn.execute(
+            """
+            SELECT name, gender, grade, math, science, english, total
+            FROM students
+            ORDER BY rowid ASC
+            """
+        ).fetchall()
+    if not rows:
+        return pd.DataFrame(columns=["name", "gender", "grade", "math", "science", "english", "total"])
+    return pd.DataFrame([dict(r) for r in rows])
+
+
 def update_student_status(student_id: int, status: str) -> dict:
     """
     Update a single student's status. Returns the updated row.

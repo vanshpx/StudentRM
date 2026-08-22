@@ -108,9 +108,10 @@ def run_cleaning_pipeline(df_raw: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
         if col not in df.columns:
             df[col] = pd.NA
 
-    # Cast total to float early (we may need to null it out later)
-    # NOTE: math/science/english are cast AFTER score text extraction in Rule 3
-    df["total"] = pd.to_numeric(df["total"], errors="coerce").astype(float)
+    # Cast total to float early (we may need to null it out later).
+    # Use astype(object) first so that Python None from SQLite rows (append mode)
+    # doesn't cause TypeError in pd.to_numeric with mixed-type series.
+    df["total"] = pd.to_numeric(df["total"].astype(object), errors="coerce").astype(float)
 
     # Initialise flag columns as Python bool objects (avoids numpy bool identity issues)
     df["is_incomplete"] = False
@@ -123,24 +124,31 @@ def run_cleaning_pipeline(df_raw: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
     df.loc[missing_name_mask, "is_incomplete"] = True
 
     # ------------------------------------------------------------------
-    # Rule 2 — Strict deduplication: remove only when ALL columns match
-    # Build a normalized composite key across all data columns.
+    # Rule 2 — Strict deduplication: remove only when ALL columns match.
+    # Normalize numeric columns to float string so that "85" and "85.0"
+    # (which appear from CSV vs SQLite rows in append mode) match correctly.
     # ------------------------------------------------------------------
     def _norm_str(series: pd.Series) -> pd.Series:
         return series.astype(str).str.strip().str.lower().str.replace(r"\s+", " ", regex=True)
+
+    def _norm_score(series: pd.Series) -> pd.Series:
+        """Convert score column to a canonical numeric string for dedup keying."""
+        numeric = pd.to_numeric(series.astype(object), errors="coerce")
+        return numeric.apply(lambda v: f"{v:.4f}" if pd.notna(v) else "")
 
     df["_key"] = (
         _norm_str(df["name"].fillna(""))
         + "|" + _norm_str(df["gender"].fillna(""))
         + "|" + _norm_str(df["grade"].fillna(""))
-        + "|" + _norm_str(df["math"].fillna(""))
-        + "|" + _norm_str(df["science"].fillna(""))
-        + "|" + _norm_str(df["english"].fillna(""))
+        + "|" + _norm_score(df["math"])
+        + "|" + _norm_score(df["science"])
+        + "|" + _norm_score(df["english"])
     )
     before_dedup = len(df)
     df = df.drop_duplicates(subset=["_key"], keep="first")
     duplicates_removed = before_dedup - len(df)
     df = df.drop(columns=["_key"])
+
 
     # ------------------------------------------------------------------
     # Rule 3 — Typo canonicalization: Gender, Grade, and Score values

@@ -23,6 +23,7 @@ from backend.models import (
     UploadResponse,
     StudentsResponse,
 )
+from backend.store import get_students_as_df
 
 app = FastAPI(title="Student Pipeline API", version="1.0.0")
 
@@ -41,21 +42,51 @@ def on_startup():
 # ---------------------------------------------------------------------------
 
 @app.post("/api/upload", response_model=UploadResponse)
-async def upload_csv(file: UploadFile = File(...)):
+async def upload_csv(
+    file: UploadFile = File(...),
+    mode: str = "replace",
+):
     """
     Accept a raw CSV, run the cleaning pipeline, persist to SQLite.
-    Replaces any previously active batch (single-batch MVP).
+
+    mode=replace (default): wipe existing data, load new CSV fresh.
+    mode=append: concatenate new CSV with existing data, re-run the
+                 full cleaning pipeline on the combined dataset so that
+                 cross-file deduplication works correctly.
     """
+    if mode not in ("replace", "append"):
+        raise HTTPException(status_code=400, detail="mode must be 'replace' or 'append'")
+
     if not file.filename.endswith(".csv"):
         raise HTTPException(status_code=400, detail="Only .csv files are accepted.")
 
     raw_bytes = await file.read()
     try:
-        df_raw = pd.read_csv(io.BytesIO(raw_bytes))
+        df_new = pd.read_csv(io.BytesIO(raw_bytes))
     except Exception as exc:
         raise HTTPException(status_code=400, detail=f"Could not parse CSV: {exc}")
 
-    # Run the cleaning pipeline
+    if mode == "append" and store.get_active_students():
+        # Normalize df_new column names to canonical lowercase BEFORE concat.
+        # Without this, 'Total' (CSV) and 'total' (SQLite) produce TWO columns
+        # after concat, which causes df["total"] to return a 2D DataFrame and
+        # breaks pd.to_numeric inside the cleaning pipeline.
+        _col_aliases = {
+            "maths": "math", "mathematics": "math", "sci": "science", "eng": "english",
+            "grand total": "total", "total marks": "total", "tot": "total",
+            "student name": "name", "student_name": "name", "sex": "gender",
+            "class": "grade", "std": "grade",
+        }
+        df_new.columns = [c.strip().lower() for c in df_new.columns]
+        df_new = df_new.rename(columns=_col_aliases)
+
+        df_existing = get_students_as_df()
+        df_raw = pd.concat([df_existing, df_new], ignore_index=True)
+    else:
+        df_raw = df_new
+
+
+    # Run the cleaning pipeline on the (possibly combined) dataset
     df_clean, report = run_cleaning_pipeline(df_raw)
 
     batch_id = str(uuid.uuid4())
@@ -110,6 +141,16 @@ def get_students():
     rows = store.get_active_students()
     students = [Student(**r) for r in rows]
     return StudentsResponse(students=students)
+
+
+@app.delete("/api/students")
+def delete_all_students():
+    """
+    Delete all current records (wipes the active batch entirely).
+    Used by the 'Clear All' button in the UI.
+    """
+    store.delete_old_batch()
+    return {"deleted": True, "students": []}
 
 
 @app.patch("/api/students/{student_id}/status")
