@@ -5,6 +5,7 @@ All data transformation logic lives in cleaning.py; routes are thin.
 
 import io
 import csv
+import logging
 import uuid
 from pathlib import Path
 
@@ -13,6 +14,12 @@ from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 import pandas as pd
+
+# Configure cleaning pipeline logs to show in the uvicorn terminal
+logging.basicConfig(
+    level=logging.WARNING,
+    format="%(levelname)s  [%(name)s]  %(message)s",
+)
 
 from backend import store
 from backend.cleaning import run_cleaning_pipeline

@@ -3,11 +3,14 @@ Data cleaning pipeline — all cleaning rules live here, nowhere else.
 Routes in main.py must not contain any data transformation logic.
 """
 
+import logging
 import re
 import time
 from typing import Any
 
 import pandas as pd
+
+logger = logging.getLogger("cleaning")
 
 # ---------------------------------------------------------------------------
 # Canonicalization dictionaries (Rule 3 — typo canonicalization)
@@ -132,19 +135,61 @@ def run_cleaning_pipeline(df_raw: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
         return series.astype(str).str.strip().str.lower().str.replace(r"\s+", " ", regex=True)
 
     def _norm_score(series: pd.Series) -> pd.Series:
-        """Convert score column to a canonical numeric string for dedup keying."""
-        numeric = pd.to_numeric(series.astype(object), errors="coerce")
-        return numeric.apply(lambda v: f"{v:.4f}" if pd.notna(v) else "")
+        """
+        Canonical numeric string for dedup keying.
+        Uses _extract_numeric_score so '66 marks' → 66.0 → '66.0000'
+        instead of coercing to NaN → '' which caused false duplicate matches.
+        """
+        extracted = series.apply(_extract_numeric_score)
+        return extracted.apply(lambda v: f"{v:.4f}" if v is not None and pd.notna(v) else "")
+
+    def _norm_name(series: pd.Series) -> pd.Series:
+        """Strip surrounding/trailing quotes before lowercasing for dedup key."""
+        return (
+            series.fillna("")
+            .astype(str)
+            .str.strip()
+            .str.strip("\"'")   # remove quotes that appear in the raw CSV
+            .str.strip()
+            .str.lower()
+            .str.replace(r"\s+", " ", regex=True)
+        )
 
     df["_key"] = (
-        _norm_str(df["name"].fillna(""))
+        _norm_name(df["name"])
         + "|" + _norm_str(df["gender"].fillna(""))
         + "|" + _norm_str(df["grade"].fillna(""))
         + "|" + _norm_score(df["math"])
         + "|" + _norm_score(df["science"])
         + "|" + _norm_score(df["english"])
     )
+
     before_dedup = len(df)
+
+    # Find which rows are duplicates (not the first occurrence)
+    is_dup = df.duplicated(subset=["_key"], keep="first")
+    if is_dup.any():
+        dup_rows = df[is_dup]
+        logger.warning("[DEDUP] %d duplicate row(s) removed:", len(dup_rows))
+        for csv_row_num, (_, row) in enumerate(dup_rows.iterrows(), start=1):
+            name_val = row.get("name", "(no name)")
+            # original 1-based row number in the input (index + 2 accounts for header)
+            original_row = row.name + 2  # pandas index is 0-based, +1 for header, +1 for 1-based
+            logger.warning(
+                "  Row %d (CSV line ~%d): name='%s' gender='%s' grade='%s' "
+                "math=%s science=%s english=%s",
+                csv_row_num,
+                original_row,
+                name_val,
+                row.get("gender", ""),
+                row.get("grade", ""),
+                row.get("math", ""),
+                row.get("science", ""),
+                row.get("english", ""),
+            )
+    else:
+        logger.info("[DEDUP] No duplicates found.")
+
     df = df.drop_duplicates(subset=["_key"], keep="first")
     duplicates_removed = before_dedup - len(df)
     df = df.drop(columns=["_key"])
