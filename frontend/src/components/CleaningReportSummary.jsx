@@ -6,6 +6,7 @@ const StatPill = ({ label, value, color = 'slate' }) => {
     blue:    'bg-blue-900/30 text-blue-300 border-blue-800',
     purple:  'bg-purple-900/30 text-purple-300 border-purple-800',
     red:     'bg-red-900/30 text-red-400 border-red-900',
+    orange:  'bg-orange-900/30 text-orange-300 border-orange-800',
     slate:   'bg-surface-200 text-slate-300 border-surface-300',
     green:   'bg-emerald-900/30 text-emerald-300 border-emerald-800',
   }
@@ -25,12 +26,12 @@ export default function CleaningReportSummary({ report }) {
     rows_cleaned,
     duplicates_removed,
     typos_fixed,
-    values_imputed,
-    rows_dropped,
+    incomplete_rows,
+    invalid_rows,
     processing_ms,
   } = report
 
-  const hasChanges = duplicates_removed > 0 || typos_fixed > 0 || values_imputed > 0 || rows_dropped > 0
+  const hasChanges = duplicates_removed > 0 || typos_fixed > 0 || incomplete_rows > 0 || invalid_rows > 0
 
   return (
     <div className="card border-brand-500/30 bg-brand-600/5" id="cleaning-report">
@@ -53,7 +54,7 @@ export default function CleaningReportSummary({ report }) {
               <span className="text-brand-400">{rows_cleaned} rows</span> from {rows_raw} raw
             </p>
             <p className="text-xs text-slate-400 mt-0.5">
-              {hasChanges ? 'Issues were found and fixed. Click to see details.' : 'No issues found. Data was clean.'}
+              {hasChanges ? 'Issues were found. Click to see details.' : 'No issues found. Data was clean.'}
               <span className="ml-2 text-slate-500">· {processing_ms}ms</span>
             </p>
           </div>
@@ -69,13 +70,15 @@ export default function CleaningReportSummary({ report }) {
       {open && (
         <div className="mt-5 pt-5 border-t border-surface-200">
           <div className="flex flex-wrap gap-2" id="cleaning-details">
-            <StatPill value={duplicates_removed} label="duplicates removed" color="yellow" />
-            <StatPill value={typos_fixed}        label="typos fixed"         color="blue" />
-            <StatPill value={values_imputed}     label="missing values filled" color="purple" />
-            {rows_dropped > 0 && (
-              <StatPill value={rows_dropped} label="rows dropped (no name)" color="red" />
+            <StatPill value={duplicates_removed} label="duplicates removed"   color="yellow" />
+            <StatPill value={typos_fixed}        label="typos / text fixed"   color="blue"   />
+            {incomplete_rows > 0 && (
+              <StatPill value={incomplete_rows}  label="incomplete rows flagged" color="orange" />
             )}
-            <StatPill value={`${processing_ms}ms`} label="pipeline time" color="green" />
+            {invalid_rows > 0 && (
+              <StatPill value={invalid_rows}     label="invalid scores (>100)"  color="red"    />
+            )}
+            <StatPill value={`${processing_ms}ms`} label="pipeline time"     color="green"  />
           </div>
 
           <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
@@ -88,8 +91,10 @@ export default function CleaningReportSummary({ report }) {
               <div className="text-white font-semibold">{rows_cleaned}</div>
             </div>
             <div className="bg-surface-200 rounded-lg p-3">
-              <div className="text-slate-400 text-xs mb-1">Removed</div>
-              <div className="text-red-400 font-semibold">{rows_raw - rows_cleaned}</div>
+              <div className="text-slate-400 text-xs mb-1">Incomplete</div>
+              <div className={`font-semibold ${incomplete_rows > 0 ? 'text-orange-400' : 'text-slate-400'}`}>
+                {incomplete_rows}
+              </div>
             </div>
             <div className="bg-surface-200 rounded-lg p-3">
               <div className="text-slate-400 text-xs mb-1">Speed</div>

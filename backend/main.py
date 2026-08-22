@@ -76,7 +76,7 @@ async def upload_csv(file: UploadFile = File(...)):
         student_rows.append(
             {
                 "batch_id": batch_id,
-                "name": row.get("name"),
+                "name": row.get("name") if not pd.isna(row.get("name")) else None,
                 "gender": row.get("gender") if row.get("gender") is not None else None,
                 "grade": str(row.get("grade")) if row.get("grade") is not None else None,
                 "math": float(row["math"]) if pd.notna(row.get("math")) else None,
@@ -84,6 +84,8 @@ async def upload_csv(file: UploadFile = File(...)):
                 "english": float(row["english"]) if pd.notna(row.get("english")) else None,
                 "total": float(row["total"]) if pd.notna(row.get("total")) else None,
                 "status": "Active",
+                "is_incomplete": bool(row.get("is_incomplete", False)),
+                "is_invalid": bool(row.get("is_invalid", False)),
             }
         )
     store.insert_students(student_rows)

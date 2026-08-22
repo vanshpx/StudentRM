@@ -30,15 +30,16 @@ def init_db() -> None:
                 rows_raw INTEGER,
                 rows_cleaned INTEGER,
                 duplicates_removed INTEGER,
-                values_imputed INTEGER,
                 typos_fixed INTEGER,
+                incomplete_rows INTEGER,
+                invalid_rows INTEGER,
                 processing_ms REAL
             );
 
             CREATE TABLE IF NOT EXISTS students (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 batch_id TEXT NOT NULL REFERENCES upload_batches(batch_id),
-                name TEXT NOT NULL,
+                name TEXT,
                 gender TEXT,
                 grade TEXT,
                 math REAL,
@@ -47,6 +48,8 @@ def init_db() -> None:
                 total REAL,
                 status TEXT NOT NULL DEFAULT 'Active'
                     CHECK(status IN ('Active','Debarred')),
+                is_incomplete INTEGER NOT NULL DEFAULT 0,
+                is_invalid INTEGER NOT NULL DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         """)
@@ -58,7 +61,6 @@ def delete_old_batch() -> None:
     Since MVP supports only one batch at a time, we wipe everything.
     """
     with _get_conn() as conn:
-        # Get all existing batch_ids
         rows = conn.execute("SELECT batch_id FROM upload_batches").fetchall()
         for row in rows:
             conn.execute(
@@ -76,8 +78,8 @@ def insert_batch(batch_data: dict) -> None:
             """
             INSERT INTO upload_batches
                 (batch_id, filename, rows_raw, rows_cleaned,
-                 duplicates_removed, values_imputed, typos_fixed, processing_ms)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                 duplicates_removed, typos_fixed, incomplete_rows, invalid_rows, processing_ms)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 batch_data["batch_id"],
@@ -85,8 +87,9 @@ def insert_batch(batch_data: dict) -> None:
                 batch_data["rows_raw"],
                 batch_data["rows_cleaned"],
                 batch_data["duplicates_removed"],
-                batch_data["values_imputed"],
                 batch_data["typos_fixed"],
+                batch_data["incomplete_rows"],
+                batch_data["invalid_rows"],
                 batch_data["processing_ms"],
             ),
         )
@@ -100,13 +103,14 @@ def insert_students(students: list[dict]) -> None:
         conn.executemany(
             """
             INSERT INTO students
-                (batch_id, name, gender, grade, math, science, english, total, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (batch_id, name, gender, grade, math, science, english, total,
+                 status, is_incomplete, is_invalid)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
                 (
                     s["batch_id"],
-                    s["name"],
+                    s.get("name"),
                     s.get("gender"),
                     s.get("grade"),
                     s.get("math"),
@@ -114,6 +118,8 @@ def insert_students(students: list[dict]) -> None:
                     s.get("english"),
                     s.get("total"),
                     s.get("status", "Active"),
+                    1 if s.get("is_incomplete") else 0,
+                    1 if s.get("is_invalid") else 0,
                 )
                 for s in students
             ],
@@ -126,12 +132,19 @@ def get_active_students() -> list[dict]:
         rows = conn.execute(
             """
             SELECT s.id, s.batch_id, s.name, s.gender, s.grade,
-                   s.math, s.science, s.english, s.total, s.status
+                   s.math, s.science, s.english, s.total, s.status,
+                   s.is_incomplete, s.is_invalid
             FROM students s
             ORDER BY s.name ASC
             """
         ).fetchall()
-    return [dict(r) for r in rows]
+    result = []
+    for r in rows:
+        d = dict(r)
+        d["is_incomplete"] = bool(d["is_incomplete"])
+        d["is_invalid"] = bool(d["is_invalid"])
+        result.append(d)
+    return result
 
 
 def update_student_status(student_id: int, status: str) -> dict:
@@ -154,7 +167,8 @@ def update_student_status(student_id: int, status: str) -> dict:
 
 def get_export_students(min_total: float) -> list[dict]:
     """
-    Return Active students whose total >= min_total, for CSV export.
+    Return Active, complete students whose total >= min_total, for CSV export.
+    Excludes is_incomplete rows (they have no valid Total to filter on).
     Server is authoritative for the export — never trust client state.
     """
     with _get_conn() as conn:
@@ -163,6 +177,7 @@ def get_export_students(min_total: float) -> list[dict]:
             SELECT name, gender, grade, math, science, english, total, status
             FROM students
             WHERE status = 'Active'
+              AND is_incomplete = 0
               AND total >= ?
             ORDER BY total DESC, name ASC
             """,

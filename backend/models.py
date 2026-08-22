@@ -6,7 +6,7 @@ from pydantic import BaseModel
 class Student(BaseModel):
     id: int
     batch_id: str
-    name: str
+    name: Optional[str] = None
     gender: Optional[str] = None
     grade: Optional[str] = None
     math: Optional[float] = None
@@ -14,6 +14,8 @@ class Student(BaseModel):
     english: Optional[float] = None
     total: Optional[float] = None
     status: Literal["Active", "Debarred"]
+    is_incomplete: bool = False
+    is_invalid: bool = False
 
 
 class CleaningReport(BaseModel):
@@ -21,8 +23,8 @@ class CleaningReport(BaseModel):
     rows_cleaned: int
     duplicates_removed: int
     typos_fixed: int
-    values_imputed: int
-    rows_dropped: int
+    incomplete_rows: int
+    invalid_rows: int
     processing_ms: float
 
 
