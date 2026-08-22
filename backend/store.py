@@ -187,8 +187,10 @@ def update_student_status(student_id: int, status: str) -> dict:
 
 def get_export_students(min_total: float) -> list[dict]:
     """
-    Return Active, complete students whose total >= min_total, for CSV export.
-    Excludes is_incomplete rows (they have no valid Total to filter on).
+    Return Active, clean students whose total >= min_total, for CSV export.
+    Excludes:
+      - is_incomplete rows (missing name or any score — no valid Total)
+      - is_invalid rows (any score > 100 — data integrity concern)
     Server is authoritative for the export — never trust client state.
     """
     with _get_conn() as conn:
@@ -198,9 +200,11 @@ def get_export_students(min_total: float) -> list[dict]:
             FROM students
             WHERE status = 'Active'
               AND is_incomplete = 0
+              AND is_invalid = 0
               AND total >= ?
             ORDER BY total DESC, name ASC
             """,
             (min_total,),
         ).fetchall()
     return [dict(r) for r in rows]
+

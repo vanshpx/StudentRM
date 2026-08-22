@@ -138,7 +138,7 @@ export default function App() {
         {/* ── Stats + filter row ── */}
         {hasData && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <ShortlistStats filteredStudents={filteredStudents} />
+            <ShortlistStats filteredStudents={filteredStudents} allStudents={students} />
             <div className="md:col-span-1 flex items-end">
               <ScoreFilterInput value={minTotal} onChange={setMinTotal} />
             </div>
