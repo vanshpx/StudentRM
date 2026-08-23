@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: recruitment-manager
+    runtime: python
+    region: singapore   # closest to India — change to oregon/frankfurt if preferred
+    plan: free
+
+    # ── Build ─────────────────────────────────────────────────────────────────
+    # Install Node, build the React frontend, then install Python deps.
+    buildCommand: |
+      curl -fsSL https://deb.nodesource.com/setup_20.x | bash - &&
+      apt-get install -y nodejs &&
+      cd frontend && npm install && npm run build && cd .. &&
+      pip install -r requirements.txt
+
+    # ── Start ─────────────────────────────────────────────────────────────────
+    startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
+
+    # ── Environment variables ─────────────────────────────────────────────────
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9"
