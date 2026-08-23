@@ -1,4 +1,6 @@
-// Simple toggle Switch component (no external shadcn dependency needed)
+import { useState, useRef, useEffect } from 'react'
+
+// Simple toggle Switch component
 function Switch({ checked, onChange, id }) {
   return (
     <button
@@ -14,126 +16,300 @@ function Switch({ checked, onChange, id }) {
   )
 }
 
-function ScoreBar({ value, max = 100, invalid = false }) {
+function ScoreCell({ value, max = 100, invalid = false }) {
   const pct = Math.min(100, ((value ?? 0) / max) * 100)
   return (
-    <div className="flex items-center gap-2">
-      <span className={`text-sm tabular-nums w-8 text-right ${invalid ? 'text-red-400 font-semibold' : ''}`}>
+    <div className="flex flex-col gap-1 min-w-[60px]">
+      <span className={`text-sm font-semibold tabular-nums ${invalid ? 'text-red-500' : 'text-slate-700'}`}>
         {value?.toFixed(0) ?? '—'}
       </span>
-      <div className="flex-1 h-1.5 bg-surface-200 rounded-full overflow-hidden">
+      <div className="h-1 w-full bg-surface-300 rounded-full overflow-hidden">
         <div
-          className={`h-full rounded-full transition-all ${invalid ? 'bg-red-500' : 'bg-gradient-to-r from-brand-600 to-indigo-400'}`}
-          style={{ width: `${Math.min(pct, 100)}%` }}
+          className={`h-full rounded-full ${invalid ? 'bg-red-400' : 'bg-brand-500'}`}
+          style={{ width: `${pct}%` }}
         />
       </div>
     </div>
   )
 }
 
-function FlagBadge({ isIncomplete, isInvalid }) {
-  if (!isIncomplete && !isInvalid) return null
+// ── Filter dropdown ──────────────────────────────────────────────────────────
+function FilterDropdown({ filters, onChange, onClear, activeCount }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+
+  // Close on outside click
+  useEffect(() => {
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const statusOptions  = ['All', 'Active', 'Debarred']
+  const flaggedOptions = ['All', 'Yes', 'No']
+
   return (
-    <div className="flex flex-col gap-1">
-      {isIncomplete && (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-orange-900/30 text-orange-300 border border-orange-800">
-          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-              d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-          </svg>
-          Incomplete
-        </span>
-      )}
-      {isInvalid && (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-900/30 text-red-400 border border-red-900">
-          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-              d="M6 18L18 6M6 6l12 12" />
-          </svg>
-          Invalid score
-        </span>
+    <div className="relative" ref={ref}>
+      <button
+        id="filter-btn"
+        onClick={() => setOpen(o => !o)}
+        className={`w-8 h-8 rounded-lg border flex items-center justify-center transition-colors relative
+          ${open || activeCount > 0
+            ? 'border-brand-400 bg-brand-50 text-brand-600'
+            : 'border-surface-300 bg-surface-200 text-slate-500 hover:text-brand-600 hover:border-brand-300'
+          }`}
+      >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+            d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+        </svg>
+        {/* Active filter badge */}
+        {activeCount > 0 && (
+          <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-brand-600 text-white text-[9px] font-black flex items-center justify-center">
+            {activeCount}
+          </span>
+        )}
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-10 z-50 w-56 bg-white border border-surface-300 rounded-2xl shadow-xl shadow-slate-900/10 p-4 space-y-4">
+
+          {/* Status filter */}
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Status</p>
+            <div className="flex gap-1.5 flex-wrap">
+              {statusOptions.map(opt => (
+                <button
+                  key={opt}
+                  onClick={() => onChange('status', opt)}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors
+                    ${filters.status === opt
+                      ? 'bg-brand-600 text-white shadow-sm'
+                      : 'bg-surface-200 text-slate-500 hover:bg-surface-300'
+                    }`}
+                >
+                  {opt}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Flagged filter */}
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Flagged</p>
+            <div className="flex gap-1.5 flex-wrap">
+              {flaggedOptions.map(opt => (
+                <button
+                  key={opt}
+                  onClick={() => onChange('flagged', opt)}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors
+                    ${filters.flagged === opt
+                      ? opt === 'Yes' ? 'bg-orange-500 text-white shadow-sm' : 'bg-brand-600 text-white shadow-sm'
+                      : 'bg-surface-200 text-slate-500 hover:bg-surface-300'
+                    }`}
+                >
+                  {opt}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Clear */}
+          {activeCount > 0 && (
+            <button
+              onClick={() => { onClear(); setOpen(false) }}
+              className="w-full text-xs font-bold text-red-500 hover:text-red-600 border border-red-200 hover:border-red-300 rounded-lg py-1.5 transition-colors"
+            >
+              Clear filters
+            </button>
+          )}
+        </div>
       )}
     </div>
   )
 }
 
+// ── Main table ───────────────────────────────────────────────────────────────
 export default function StudentTable({ students, minTotal, onToggle }) {
   const qualifies = (s) => s.status === 'Active' && !s.is_incomplete && (s.total ?? 0) >= minTotal
 
+  // Filter state
+  const [filters, setFilters] = useState({ status: 'All', flagged: 'All' })
+
+  const handleFilterChange = (key, value) => setFilters(prev => ({ ...prev, [key]: value }))
+  const handleClearFilters = () => setFilters({ status: 'All', flagged: 'All' })
+
+  const activeFilterCount = (filters.status !== 'All' ? 1 : 0) + (filters.flagged !== 'All' ? 1 : 0)
+
+  // Apply filters
+  const visibleStudents = students.filter(s => {
+    if (filters.status !== 'All' && s.status !== filters.status) return false
+    const isFlagged = s.is_incomplete || s.is_invalid
+    if (filters.flagged === 'Yes' && !isFlagged) return false
+    if (filters.flagged === 'No'  &&  isFlagged) return false
+    return true
+  })
+
+  const columns = [
+    { key: 'name',    label: 'Student Name' },
+    { key: 'gender',  label: 'Gender' },
+    { key: 'grade',   label: 'Grade' },
+    { key: 'math',    label: 'Math' },
+    { key: 'science', label: 'Science' },
+    { key: 'english', label: 'English' },
+    { key: 'total',   label: 'Total Score' },
+    { key: 'status',  label: 'Status' },
+    { key: 'flagged', label: 'Flagged' },
+    { key: 'action',  label: 'Action' },
+  ]
+
   return (
     <div className="card p-0 overflow-hidden" id="student-table">
-      <div className="px-6 py-4 border-b border-surface-200 flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-white">
-          All Students
-          <span className="ml-2 text-slate-400 font-normal">({students.length} total)</span>
-        </h2>
-        <p className="text-xs text-slate-500">
-          Grayed rows are Debarred, below threshold, or flagged
-        </p>
+
+      {/* Card header */}
+      <div className="px-6 py-4 border-b border-surface-300 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <h2 className="text-sm font-black text-slate-800 uppercase tracking-wider">
+            Recent Candidates
+          </h2>
+          <span className="text-xs text-slate-400 font-semibold">
+            {visibleStudents.length} of {students.length}
+          </span>
+          {/* Active filter pills */}
+          {filters.status !== 'All' && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand-50 border border-brand-200 text-[10px] font-bold text-brand-600">
+              {filters.status}
+              <button onClick={() => handleFilterChange('status', 'All')} className="hover:text-brand-800">✕</button>
+            </span>
+          )}
+          {filters.flagged !== 'All' && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-orange-50 border border-orange-200 text-[10px] font-bold text-orange-600">
+              Flagged: {filters.flagged}
+              <button onClick={() => handleFilterChange('flagged', 'All')} className="hover:text-orange-800">✕</button>
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2">
+          <FilterDropdown
+            filters={filters}
+            onChange={handleFilterChange}
+            onClear={handleClearFilters}
+            activeCount={activeFilterCount}
+          />
+          <button className="w-8 h-8 rounded-lg border border-surface-300 bg-surface-200 flex items-center justify-center text-slate-500 hover:text-brand-600 hover:border-brand-300 transition-colors">
+            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 5a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm0 7a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm0 7a1.5 1.5 0 110-3 1.5 1.5 0 010 3z"/>
+            </svg>
+          </button>
+        </div>
       </div>
 
       <div className="overflow-x-auto">
         <table className="w-full" aria-label="Student data table">
-          <thead className="bg-surface-200/50">
+          <thead className="bg-surface-200/70">
             <tr>
-              {['Name', 'Gender', 'Grade', 'Math', 'Science', 'English', 'Total', 'Flags', 'Status'].map(col => (
-                <th key={col} className="table-header text-left">{col}</th>
+              {columns.map(col => (
+                <th key={col.key} className="table-header text-left whitespace-nowrap">{col.label}</th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {students.map((s) => {
-              const isQualifying = qualifies(s)
-              const isDebarred = s.status === 'Debarred'
-              const mathInvalid = s.math != null && s.math > 100
-              const scienceInvalid = s.science != null && s.science > 100
-              const englishInvalid = s.english != null && s.english > 100
+            {visibleStudents.length === 0 ? (
+              <tr>
+                <td colSpan={columns.length} className="text-center py-12 text-sm text-slate-400 font-medium">
+                  No students match the current filters.
+                  <button onClick={handleClearFilters} className="ml-2 text-brand-500 font-bold hover:underline">Clear filters</button>
+                </td>
+              </tr>
+            ) : (
+              visibleStudents.map((s) => {
+                const isQualifying   = qualifies(s)
+                const isDebarred     = s.status === 'Debarred'
+                const isFlagged      = s.is_incomplete || s.is_invalid
+                const mathInvalid    = s.math != null && s.math > 100
+                const scienceInvalid = s.science != null && s.science > 100
+                const englishInvalid = s.english != null && s.english > 100
 
-              return (
-                <tr
-                  key={s.id}
-                  id={`student-row-${s.id}`}
-                  className={`table-row ${!isQualifying ? 'opacity-40' : ''}`}
-                >
-                  <td className={`table-cell font-medium ${isDebarred ? 'line-through text-slate-500' : 'text-white'}`}>
-                    {s.name ?? <span className="italic text-slate-600">No name</span>}
-                  </td>
-                  <td className="table-cell">{s.gender ?? <span className="text-slate-600">—</span>}</td>
-                  <td className="table-cell">{s.grade ?? <span className="text-slate-600">—</span>}</td>
-                  <td className="table-cell">
-                    <ScoreBar value={s.math} max={100} invalid={mathInvalid} />
-                  </td>
-                  <td className="table-cell">
-                    <ScoreBar value={s.science} max={100} invalid={scienceInvalid} />
-                  </td>
-                  <td className="table-cell">
-                    <ScoreBar value={s.english} max={100} invalid={englishInvalid} />
-                  </td>
-                  <td className="table-cell">
-                    <span className={`font-bold tabular-nums ${
-                      isQualifying ? 'text-brand-400' : 'text-slate-500'
-                    }`}>
-                      {s.total?.toFixed(1) ?? '—'}
-                    </span>
-                  </td>
-                  <td className="table-cell">
-                    <FlagBadge isIncomplete={s.is_incomplete} isInvalid={s.is_invalid} />
-                  </td>
-                  <td className="table-cell">
-                    <div className="flex items-center gap-2">
+                return (
+                  <tr
+                    key={s.id}
+                    id={`student-row-${s.id}`}
+                    className={`table-row ${!isQualifying ? 'opacity-50' : ''}`}
+                  >
+                    {/* Name */}
+                    <td className="table-cell whitespace-nowrap">
+                      <span className={`font-semibold ${isDebarred ? 'line-through text-slate-400' : 'text-slate-800'}`}>
+                        {s.name ?? <span className="italic text-slate-400">No name</span>}
+                      </span>
+                    </td>
+
+                    {/* Gender */}
+                    <td className="table-cell">
+                      <span className="text-slate-600">{s.gender ?? <span className="text-slate-300">—</span>}</span>
+                    </td>
+
+                    {/* Grade */}
+                    <td className="table-cell">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-surface-200 text-slate-600 text-xs font-semibold">
+                        {s.grade ?? <span className="text-slate-300">—</span>}
+                      </span>
+                    </td>
+
+                    {/* Math */}
+                    <td className="table-cell">
+                      <ScoreCell value={s.math} invalid={mathInvalid} />
+                    </td>
+
+                    {/* Science */}
+                    <td className="table-cell">
+                      <ScoreCell value={s.science} invalid={scienceInvalid} />
+                    </td>
+
+                    {/* English */}
+                    <td className="table-cell">
+                      <ScoreCell value={s.english} invalid={englishInvalid} />
+                    </td>
+
+                    {/* Total score */}
+                    <td className="table-cell">
+                      <span className={`font-black tabular-nums text-base ${
+                        isQualifying ? 'text-slate-900' : 'text-slate-400'
+                      }`}>
+                        {s.total?.toFixed(1) ?? '—'}
+                      </span>
+                    </td>
+
+                    {/* Status badge */}
+                    <td className="table-cell">
+                      {isDebarred ? (
+                        <span className="badge-debarred">Debarred</span>
+                      ) : (
+                        <span className="badge-qualified">Qualified</span>
+                      )}
+                    </td>
+
+                    {/* Flagged */}
+                    <td className="table-cell">
+                      {isFlagged ? (
+                        <span className="text-xs font-bold text-orange-500 uppercase tracking-wider">Yes</span>
+                      ) : (
+                        <span className="text-xs font-semibold text-slate-300 uppercase tracking-wider">No</span>
+                      )}
+                    </td>
+
+                    {/* Toggle action */}
+                    <td className="table-cell">
                       <Switch
                         id={`toggle-${s.id}`}
                         checked={s.status === 'Active'}
                         onChange={() => onToggle(s.id, s.status)}
                       />
-                      <span className={`text-xs font-medium ${isDebarred ? 'text-red-400' : 'text-emerald-400'}`}>
-                        {s.status}
-                      </span>
-                    </div>
-                  </td>
-                </tr>
-              )
-            })}
+                    </td>
+                  </tr>
+                )
+              })
+            )}
           </tbody>
         </table>
       </div>

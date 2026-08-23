@@ -49,93 +49,152 @@ export default function UploadZone({ onSuccess, hasData }) {
   })
 
   return (
-    <div className="space-y-3" id="upload-section">
-
-      {/* ── Replace / Append toggle (only shown when data already exists) ── */}
-      {hasData && (
-        <div className="flex items-center gap-2 justify-end" id="upload-mode-toggle">
-          <span className="text-xs text-slate-400">Upload mode:</span>
-          <div className="flex rounded-lg overflow-hidden border border-surface-300 text-xs font-medium">
-            <button
-              id="mode-replace"
-              onClick={() => setMode('replace')}
-              className={`px-3 py-1.5 transition-colors ${
-                mode === 'replace'
-                  ? 'bg-red-600/80 text-white'
-                  : 'bg-surface-200 text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              Replace
-            </button>
-            <button
-              id="mode-append"
-              onClick={() => setMode('append')}
-              className={`px-3 py-1.5 transition-colors ${
-                mode === 'append'
-                  ? 'bg-brand-600/80 text-white'
-                  : 'bg-surface-200 text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              Append
-            </button>
-          </div>
-          <span className="text-xs text-slate-500 italic">
-            {mode === 'append'
-              ? '↗ merges with existing data'
-              : '⚠ overwrites all existing data'}
-          </span>
-        </div>
-      )}
-
-      {/* ── Dropzone ── */}
+    <div
+      className={`bg-white border-2 border-dashed rounded-2xl shadow-sm flex flex-col items-center gap-5 p-6 transition-all duration-200 cursor-pointer
+        ${isDragActive ? 'border-brand-500 bg-brand-50/60' : 'border-surface-400'}
+        ${uploading ? 'cursor-wait opacity-70' : ''}`}
+      id="upload-section"
+    >
+      {/* ── Upload dropzone area ── */}
       <div
         {...getRootProps()}
-        className={`upload-zone ${isDragActive ? 'upload-zone-active' : ''} ${uploading ? 'cursor-wait opacity-70' : ''}`}
+        className="flex flex-col items-center gap-4 w-full text-center outline-none"
         id="upload-zone"
       >
         <input {...getInputProps()} id="csv-file-input" />
 
         {uploading ? (
           <>
-            <div className="w-10 h-10 rounded-full border-2 border-brand-500 border-t-transparent animate-spin" />
-            <p className="text-sm text-slate-400 font-medium">
-              {mode === 'append' ? 'Merging and cleaning data…' : 'Cleaning your data…'}
+            <div className="w-14 h-14 rounded-full border-[3px] border-brand-600 border-t-transparent animate-spin" />
+            <p className="text-sm text-slate-500 font-semibold">
+              {mode === 'append' ? 'Merging data…' : 'Cleaning data…'}
             </p>
           </>
         ) : (
           <>
-            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-colors duration-200
-              ${isDragActive ? 'bg-brand-500/20 border border-brand-500' : 'bg-surface-200 border border-surface-300'}`}>
-              <svg className={`w-7 h-7 ${isDragActive ? 'text-brand-400' : 'text-slate-400'}`}
-                fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+            {/* Blue circle icon */}
+            <div className={`w-14 h-14 rounded-full flex items-center justify-center transition-colors duration-200
+              ${isDragActive ? 'bg-brand-500' : 'bg-brand-600'}`}>
+              <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                   d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
               </svg>
             </div>
 
-            <div className="text-center">
-              <p className="text-base font-semibold text-white">
-                {isDragActive
-                  ? 'Drop your CSV here'
-                  : hasData && mode === 'append'
-                    ? 'Drop CSV to append to current data'
-                    : hasData
-                      ? 'Drop CSV to replace current data'
-                      : 'Drop your student CSV here'}
+            <div>
+              <p className="text-sm font-black text-slate-900 uppercase tracking-wider leading-tight">
+                Upload Student<br />Data
               </p>
-              <p className="text-sm text-slate-400 mt-1">
-                or <span className="text-brand-400 font-medium cursor-pointer hover:text-brand-300">click to browse</span>
-                <span className="ml-2 text-slate-500">· .csv files only</span>
+              <p className="text-xs text-slate-400 mt-1.5 leading-snug">
+                Drag and drop CSV files here to<br />update the pipeline
               </p>
             </div>
 
+            {/* Browse button — pointer-events-none so dropzone handles the click */}
+            <div className="px-6 py-2 rounded-xl bg-brand-600 text-white text-xs font-black uppercase tracking-widest pointer-events-none shadow-md shadow-brand-900/20">
+              Browse Files
+            </div>
+
             {error && (
-              <p className="text-sm text-red-400 bg-red-900/20 border border-red-900/40 rounded-lg px-4 py-2">
+              <p className="text-xs text-red-500 bg-red-50 border border-red-200 rounded-lg px-4 py-2">
                 {error}
               </p>
             )}
           </>
         )}
+      </div>
+
+      {/* ── Divider ── */}
+      <div className="w-full h-px bg-surface-300" />
+
+      {/* ── Upload mode selector — always visible ── */}
+      <div className="w-full" id="upload-mode-toggle">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2.5 text-center">
+          Upload Mode
+        </p>
+        <div className="grid grid-cols-2 gap-2">
+
+          {/* Replace option */}
+          <button
+            id="mode-replace"
+            type="button"
+            onClick={() => setMode('replace')}
+            className={`relative flex flex-col items-center gap-1.5 rounded-xl border-2 p-3 transition-all duration-150 text-left
+              ${mode === 'replace'
+                ? 'border-red-400 bg-red-50 shadow-sm'
+                : 'border-surface-300 bg-surface-200/60 hover:border-slate-400 hover:bg-surface-200'
+              }`}
+          >
+            {/* Icon */}
+            <div className={`w-7 h-7 rounded-lg flex items-center justify-center
+              ${mode === 'replace' ? 'bg-red-500' : 'bg-slate-300'}`}>
+              <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5}
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            </div>
+            <span className={`text-[10px] font-black uppercase tracking-wider
+              ${mode === 'replace' ? 'text-red-600' : 'text-slate-500'}`}>
+              Replace
+            </span>
+            <span className={`text-[9px] leading-tight text-center
+              ${mode === 'replace' ? 'text-red-400' : 'text-slate-400'}`}>
+              Overwrites all<br/>existing data
+            </span>
+            {mode === 'replace' && (
+              <div className="absolute top-1.5 right-1.5 w-3 h-3 rounded-full bg-red-500 flex items-center justify-center">
+                <svg className="w-2 h-2 text-white" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+              </div>
+            )}
+          </button>
+
+          {/* Append option */}
+          <button
+            id="mode-append"
+            type="button"
+            onClick={() => setMode('append')}
+            className={`relative flex flex-col items-center gap-1.5 rounded-xl border-2 p-3 transition-all duration-150
+              ${mode === 'append'
+                ? 'border-brand-500 bg-brand-50 shadow-sm'
+                : 'border-surface-300 bg-surface-200/60 hover:border-slate-400 hover:bg-surface-200'
+              }`}
+          >
+            {/* Icon */}
+            <div className={`w-7 h-7 rounded-lg flex items-center justify-center
+              ${mode === 'append' ? 'bg-brand-600' : 'bg-slate-300'}`}>
+              <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5}
+                  d="M12 4v16m8-8H4" />
+              </svg>
+            </div>
+            <span className={`text-[10px] font-black uppercase tracking-wider
+              ${mode === 'append' ? 'text-brand-600' : 'text-slate-500'}`}>
+              Append
+            </span>
+            <span className={`text-[9px] leading-tight text-center
+              ${mode === 'append' ? 'text-brand-400' : 'text-slate-400'}`}>
+              Merges with<br/>existing data
+            </span>
+            {mode === 'append' && (
+              <div className="absolute top-1.5 right-1.5 w-3 h-3 rounded-full bg-brand-600 flex items-center justify-center">
+                <svg className="w-2 h-2 text-white" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+              </div>
+            )}
+          </button>
+
+        </div>
+
+        {/* Contextual hint */}
+        <p className={`text-[10px] mt-2 text-center font-medium transition-colors
+          ${mode === 'replace' ? 'text-red-400' : 'text-brand-500'}`}>
+          {mode === 'replace'
+            ? '⚠ New upload will delete all current records'
+            : '↗ New upload will merge with current records'}
+        </p>
       </div>
     </div>
   )
