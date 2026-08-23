@@ -2,20 +2,12 @@ services:
   - type: web
     name: recruitment-manager
     runtime: python
-    region: singapore   # closest to India — change to oregon/frankfurt if preferred
+    region: singapore
     plan: free
 
-    # ── Build ─────────────────────────────────────────────────────────────────
-    # Render's build environment has Node.js pre-installed — no manual install needed.
-    # 1. Build the React frontend into frontend/dist/
-    # 2. Install Python dependencies
-    buildCommand: cd frontend && npm install && npm run build && cd .. && pip install -r requirements.txt
-
-    # ── Start ─────────────────────────────────────────────────────────────────
-    # FastAPI serves both the /api/* routes AND the built frontend/dist/ static files
+    buildCommand: bash build.sh
     startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
 
-    # ── Environment variables ─────────────────────────────────────────────────
     envVars:
       - key: PYTHON_VERSION
         value: "3.11.9"

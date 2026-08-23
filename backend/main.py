@@ -215,5 +215,15 @@ def export_csv(
 # ---------------------------------------------------------------------------
 
 _DIST = Path(__file__).parent.parent / "frontend" / "dist"
+if not _DIST.exists():
+    # Fallback: resolve relative to the process working directory (Render deploy)
+    _DIST = Path.cwd() / "frontend" / "dist"
+
 if _DIST.exists():
     app.mount("/", StaticFiles(directory=str(_DIST), html=True), name="static")
+else:
+    import logging as _log
+    _log.getLogger(__name__).warning(
+        "frontend/dist not found at %s — static file serving disabled. "
+        "Run 'cd frontend && npm run build' to generate it.", _DIST
+    )
