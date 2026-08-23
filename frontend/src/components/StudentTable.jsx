@@ -131,7 +131,7 @@ function FilterDropdown({ filters, onChange, onClear, activeCount }) {
 
 // ── Main table ───────────────────────────────────────────────────────────────
 export default function StudentTable({ students, minTotal, onToggle }) {
-  const qualifies = (s) => s.status === 'Active' && !s.is_incomplete && (s.total ?? 0) >= minTotal
+  const qualifies = (s) => s.status === 'Active' && !s.is_incomplete && !s.is_invalid && (s.total ?? 0) >= minTotal
 
   // Filter state
   const [filters, setFilters] = useState({ status: 'All', flagged: 'All' })
