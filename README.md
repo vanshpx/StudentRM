@@ -1,24 +1,42 @@
-# Recruitment Manager — Student Eligibility Shortlisting Tool
+# Recruitment Manager
 
-A single-service web app for exam cells to upload raw student CSVs, auto-clean them, filter by minimum total score, manage eligibility exceptions, and export a clean shortlist.
+> Student eligibility shortlisting tool — upload raw CSVs, auto-clean, filter, manage exceptions, and export.
 
-## Stack
+---
 
-- **Backend:** FastAPI + pandas + SQLite (`sqlite3`, no ORM) + Pydantic v2
-- **Frontend:** Vite + React (plain JS) + Tailwind CSS + TanStack Query + react-dropzone + Sonner
+## Tech Stack
 
-## Quick Start
+### Backend
+| Technology | Purpose |
+|---|---|
+| **FastAPI** + Uvicorn | API framework and server |
+| **pandas** | Data cleaning pipeline |
+| **SQLite** (`sqlite3`, no ORM) | Persistence — parameterized queries only |
+| **Pydantic v2** | Request/response validation |
+| **pytest** | Backend unit tests |
 
-### 1. Create and activate the virtual environment
+### Frontend
+| Technology | Purpose |
+|---|---|
+| **Vite** + React (plain JS) | Build tool and UI framework |
+| **Tailwind CSS** | Styling |
+| **TanStack Query** | Server state, optimistic mutations |
+| **react-dropzone** | Drag-and-drop CSV upload |
+| **Sonner** | Toast notifications |
+
+---
+
+## Setup & Start
+
+### 1. Clone and create a virtual environment
 
 ```bash
-# Create (one-time)
 python -m venv .venv
 
-# Activate — Windows
+# Windows
 .venv\Scripts\activate
 
-# Activate — macOS / Linux
+# macOS / Linux
 source .venv/bin/activate
 ```
 
@@ -34,9 +52,10 @@ pip install -r requirements.txt
 uvicorn backend.main:app --reload
 ```
 
-API available at `http://localhost:8000/api/`. Interactive docs at `http://localhost:8000/docs`.
+- API: `http://localhost:8000/api/`
+- Interactive docs: `http://localhost:8000/docs`
 
-### 4. Install frontend dependencies and start the dev server (requires Node.js ≥ 18)
+### 4. Start the frontend (requires Node.js ≥ 18)
 
 ```bash
 cd frontend
@@ -44,7 +63,8 @@ npm install
 npm run dev
 ```
 
-Frontend dev server at `http://localhost:5173` — proxies `/api/*` to the backend automatically.
+- Dev server: `http://localhost:5173`
+- All `/api/*` requests are proxied to the backend automatically.
 
 ### 5. Run tests
 
@@ -52,56 +72,142 @@ Frontend dev server at `http://localhost:5173` — proxies `/api/*` to the backe
 python -m pytest backend/tests/ -v
 ```
 
-## Production Build
+### Production build
 
 ```bash
 cd frontend && npm run build
-# Then start backend — it serves frontend/dist/ as static files
 uvicorn backend.main:app --host 0.0.0.0 --port $PORT
 ```
 
+The backend serves `frontend/dist/` as static files — single origin, no CORS needed.
+
+---
+
 ## Cleaning Pipeline
 
-Automatically applied on every upload, in order:
+Applied automatically on every upload. The pipeline runs entirely in `backend/cleaning.py` — no cleaning logic lives in routes.
 
-| # | Rule | Behaviour |
-|---|---|---|
-| 1 | **Flag missing names** | Rows with no `Name` are kept but marked `is_incomplete` |
-| 2 | **Strict deduplication** | Rows where every field matches are deduplicated; first occurrence is kept |
-| 3 | **Canonicalize Gender / Grade / Scores** | `"m"` → `"Male"`, `"10th"` → `"10"`, `"85 marks"` → `85.0`, etc. |
-| 4 | **Flag missing scores** | Any row missing `Math`, `Science`, or `English` is marked `is_incomplete`; scores are **not** imputed |
-| 5 | **Recompute Total** | `Total = Math + Science + English`; the input CSV's `Total` column is never trusted |
-| 6 | **Flag invalid scores** | Any score > 100 marks the row `is_invalid` |
+---
 
-Flagged rows (incomplete or invalid) are shown in the table but visually dimmed and excluded from the qualifying shortlist and CSV export.
+### Step 1 — Flag Missing Names
+- Any row where `Name` is `null`, empty, or whitespace-only is flagged `is_incomplete = True`
+- The row is **kept** in the dataset (not dropped) so the user can see it in the table
+- Excluded from the qualifying shortlist and the CSV export
 
-## Upload Modes
+---
 
-| Mode | Behaviour |
+### Step 2 — Strict Deduplication
+- A composite key is built from: `name | gender | grade | math | science | english`
+- Before comparison, each field is normalised:
+  - **Name** — lowercased, whitespace collapsed, surrounding quotes stripped
+  - **Scores** — converted to a canonical float string (`66.0000`) so `"66"` and `"66.0"` correctly match
+  - **Text fields** — lowercased and trimmed
+- Only rows where **every field matches** are treated as duplicates — partial matches are kept
+- The **first occurrence is kept**; all subsequent duplicates are removed
+- Reported as `duplicates_removed` in the cleaning summary
+
+---
+
+### Step 3 — Canonicalize Gender
+Case-insensitive trimmed lookup:
+
+| Raw input | Canonical output |
 |---|---|
-| **Replace** (default) | Deletes all existing records, loads the new CSV fresh |
-| **Append** | Concatenates the new CSV with existing data, then re-runs the full cleaning pipeline on the combined dataset (cross-file deduplication included) |
+| `m`, `M`, `male`, `Male`, `MALE` | `Male` |
+| `f`, `F`, `female`, `Female`, `FEMALE` | `Female` |
+| `other`, `Other`, `o`, `O` | `Other` |
+| Anything else / blank | `null` — left as missing |
 
-## API Reference
+---
 
-| Method | Route | Purpose |
-|---|---|---|
-| `POST` | `/api/upload?mode=replace\|append` | Upload and clean a CSV |
-| `GET` | `/api/students` | Get all students (page-load hydration) |
-| `PATCH` | `/api/students/{id}/status` | Toggle Active / Debarred |
-| `DELETE` | `/api/students` | Clear all records |
-| `GET` | `/api/export?min_total=X` | Download filtered shortlist as CSV |
+### Step 4 — Normalize Grade
+Extracts the numeric part using `re.search(r'\d+', ...)`:
 
-## ⚠️ Known Constraint (Render Free Tier)
+| Raw input | Normalized output |
+|---|---|
+| `10`, `10 ` | `10` |
+| `10th` | `10` |
+| `Grade 10` | `10` |
+| `Std 11` | `11` |
+| `Class 9` | `9` |
 
-SQLite provides real persistence across page refreshes and server restarts **within the same running instance**. However, **a fresh Render deploy resets the database** because Render's free-tier filesystem is ephemeral across redeploys.
+If no digit is found, the original trimmed value is kept as-is.
 
-This is an honest, documented trade-off — not a bug. During a demo session, data persists correctly. For production use requiring durable storage across redeploys, upgrade to a Render plan with a persistent disk, or migrate to hosted Postgres.
+---
 
-## Demo Script (≤ 90 seconds)
+### Step 5 — Normalize Score Values
+Strips non-numeric text using `re.search(r'\d+(\.\d+)?', ...)`:
 
-1. Upload `sample_data/messy_students.csv` — cleaned table + collapsible cleaning report appear
-2. Use the **Min Total Score** slider — shortlist count and average update live
-3. Click the **filter icon** → filter by Status or Flagged
-4. Toggle one student to **Debarred** — count drops instantly, row goes muted
-5. Click **Export Shortlist** — verify the CSV matches what's on screen
+| Raw input | Extracted value |
+|---|---|
+| `85` | `85.0` |
+| `85 marks` | `85.0` |
+| `85/100` | `85.0` |
+| `85 pts` | `85.0` |
+| `85.5marks` | `85.5` |
+| `85%` | `85.0` |
+| blank / `—` / text-only | `null` |
+
+Applies to `Math`, `Science`, and `English`. Any cell whose cleaned value differs from its raw value is counted in `typos_fixed`.
+
+---
+
+### Step 6 — Flag Missing Scores
+- After score extraction, any row where `Math`, `Science`, or `English` is still `null` → `is_incomplete = True`
+- **No imputation** — missing scores are left as `null`
+- Rationale: imputing silently would misrepresent a student's actual academic record
+
+---
+
+### Step 7 — Recompute Total
+- When all three scores are present: `Total = Math + Science + English`
+- The input CSV's `Total` column is **always overwritten** — it is never trusted
+- When any score is missing: `Total` is set to `null` and the row is marked `is_incomplete`
+
+---
+
+### Step 8 — Flag Invalid Scores
+- Any row where `Math > 100`, `Science > 100`, or `English > 100` → `is_invalid = True`
+- The row is kept and the (inflated) total is still computed and shown
+- Invalid rows are excluded from the qualifying shortlist and the CSV export
+
+---
+
+> **Flagged rows** (`is_incomplete` or `is_invalid`) are stored in the database and displayed in the table with visual dimming. They are excluded from the "Students Qualify" count, the average total, and all CSV exports.
+
+---
+
+
+## Features
+
+### Upload & Clean
+- Drag-and-drop or browse for a `.csv` file
+- Pipeline runs instantly on upload; collapsible cleaning report shows exactly what changed (duplicates removed, typos fixed, rows flagged, processing time)
+- **Replace mode** — wipes existing data, loads the new file fresh
+- **Append mode** — merges new CSV with existing records and re-runs the full pipeline (cross-file deduplication included)
+
+### Live Score Filter
+- Slider controls the minimum total score threshold
+- Qualifying count and average update instantly client-side — no network call, no button press
+
+### Student Table
+- All students displayed with full columns: Name, Gender, Grade, Math, Science, English, Total, Status, Flagged, Action
+- Flagged rows (incomplete / invalid scores) are visually dimmed
+- **Filter by Status** (Active / Debarred) and **Flagged** (Yes / No) via the filter icon dropdown
+- Active filter count badge on the filter button; dismissible filter pills in the header
+
+### Debar / Undebar Toggle
+- Per-student Active ↔ Debarred switch
+- **Optimistic update** — UI changes instantly; PATCH fires in the background
+- On failure, state reverts automatically and a toast notification appears
+
+### Export
+- "Export Shortlist" downloads a CSV of Active, non-flagged students above the score threshold
+- Export is always re-filtered server-side from SQLite — never trusts client state
+
+### Persistence
+- SQLite persists state across page refreshes and server restarts within the same running instance
+- On page load, React hydrates from `GET /api/students` — no data loss on refresh
+
+---
+
