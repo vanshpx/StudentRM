@@ -49,6 +49,8 @@ pip install -r requirements.txt
 ### 3. Start the backend
 
 ```bash
+uvicorn app:app --reload
+# or equivalently:
 uvicorn backend.main:app --reload
 ```
 
