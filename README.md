@@ -3,6 +3,11 @@
 > Student eligibility shortlisting tool — upload raw CSVs, auto-clean, filter, manage exceptions, and export.
 
 ---
+## Demo video
+
+https://github.com/user-attachments/assets/d47e3ac7-ef25-4717-a243-30627ad17d0b
+
+
 
 ## Tech Stack
 
