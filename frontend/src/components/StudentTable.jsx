@@ -1,5 +1,11 @@
 import { useState, useRef, useEffect } from 'react'
 
+// Qualification rule — mirrors studentQualifies in App.jsx.
+// A student appears un-dimmed only when they are Active, have no data-quality
+// flags, and their total meets the minimum threshold.
+const qualifies = (s, minTotal) =>
+  s.status === 'Active' && !s.is_incomplete && !s.is_invalid && (s.total ?? 0) >= minTotal
+
 // Simple toggle Switch component
 function Switch({ checked, onChange, id }) {
   return (
@@ -131,8 +137,6 @@ function FilterDropdown({ filters, onChange, onClear, activeCount }) {
 
 // ── Main table ───────────────────────────────────────────────────────────────
 export default function StudentTable({ students, minTotal, onToggle }) {
-  const qualifies = (s) => s.status === 'Active' && !s.is_incomplete && !s.is_invalid && (s.total ?? 0) >= minTotal
-
   // Filter state
   const [filters, setFilters] = useState({ status: 'All', flagged: 'All' })
 
@@ -224,7 +228,7 @@ export default function StudentTable({ students, minTotal, onToggle }) {
               </tr>
             ) : (
               visibleStudents.map((s) => {
-                const isQualifying   = qualifies(s)
+                const isQualifying   = qualifies(s, minTotal)
                 const isDebarred     = s.status === 'Debarred'
                 const isFlagged      = s.is_incomplete || s.is_invalid
                 const mathInvalid    = s.math != null && s.math > 100

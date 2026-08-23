@@ -1,24 +1,30 @@
-# Virtual environment
+# ── Python ────────────────────────────────────────────────────────────────────
 .venv/
-
-# SQLite database
-data/
-
-# Python cache
 __pycache__/
 *.py[cod]
-*.pyo
 *.pyc
+*.pyo
 .pytest_cache/
 
-# Node / frontend
+# ── SQLite database ───────────────────────────────────────────────────────────
+data/
+*.db
+
+# ── Node / Frontend ───────────────────────────────────────────────────────────
 frontend/node_modules/
 frontend/dist/
+frontend/.vite/
 
-# OS
+# ── OS ────────────────────────────────────────────────────────────────────────
 .DS_Store
 Thumbs.db
+desktop.ini
 
-# IDE
+# ── IDE ───────────────────────────────────────────────────────────────────────
 .vscode/
 .idea/
+
+# ── Misc ─────────────────────────────────────────────────────────────────────
+*.png
+*.jpg
+*.jpeg

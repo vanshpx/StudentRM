@@ -7,6 +7,11 @@ import StudentTable from './components/StudentTable.jsx'
 import ScoreFilterInput from './components/ScoreFilterInput.jsx'
 import ExportButton from './components/ExportButton.jsx'
 
+// A student "qualifies" for the shortlist when they are Active,
+// have no data quality flags, and meet the minimum score threshold.
+const studentQualifies = (s, minTotal) =>
+  s.status === 'Active' && !s.is_incomplete && !s.is_invalid && (s.total ?? 0) >= minTotal
+
 // ── Root component — owns all shared state ──────────────────────────────────
 export default function App() {
   const [students, setStudents] = useState([])
@@ -69,11 +74,10 @@ export default function App() {
     }
   }
 
-  // ── Client-side filter — useMemo, zero network calls ────────────────────
+  // ── Qualifying shortlist — useMemo, zero network calls ─────────────────
+  // Mirrors the qualifies() logic in StudentTable so stat cards stay in sync.
   const filteredStudents = useMemo(
-    () => students.filter(
-      s => s.status === 'Active' && (s.total ?? 0) >= minTotal
-    ),
+    () => students.filter(s => studentQualifies(s, minTotal)),
     [students, minTotal]
   )
 
