@@ -51,7 +51,12 @@ function FilterDropdown({ filters, onChange, onClear, activeCount }) {
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
-  const statusOptions  = ['All', 'Active', 'Debarred']
+  const statusOptions  = [
+    { label: 'All',           value: 'All' },
+    { label: 'Qualified',     value: 'Active' },
+    { label: 'Not Qualified', value: 'NotQualified' },
+    { label: 'Debarred',      value: 'Debarred' },
+  ]
   const flaggedOptions = ['All', 'Yes', 'No']
 
   return (
@@ -86,15 +91,15 @@ function FilterDropdown({ filters, onChange, onClear, activeCount }) {
             <div className="flex gap-1.5 flex-wrap">
               {statusOptions.map(opt => (
                 <button
-                  key={opt}
-                  onClick={() => onChange('status', opt)}
+                  key={opt.value}
+                  onClick={() => onChange('status', opt.value)}
                   className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors
-                    ${filters.status === opt
+                    ${filters.status === opt.value
                       ? 'bg-brand-600 text-white shadow-sm'
                       : 'bg-surface-200 text-slate-500 hover:bg-surface-300'
                     }`}
                 >
-                  {opt}
+                  {opt.label}
                 </button>
               ))}
             </div>
@@ -136,19 +141,18 @@ function FilterDropdown({ filters, onChange, onClear, activeCount }) {
 }
 
 // ── Main table ───────────────────────────────────────────────────────────────
-export default function StudentTable({ students, minTotal, onToggle }) {
-  // Filter state
-  const [filters, setFilters] = useState({ status: 'All', flagged: 'All' })
-
-  const handleFilterChange = (key, value) => setFilters(prev => ({ ...prev, [key]: value }))
-  const handleClearFilters = () => setFilters({ status: 'All', flagged: 'All' })
+export default function StudentTable({ students, minTotal, onToggle, filters, onFiltersChange }) {
+  const handleFilterChange = (key, value) => onFiltersChange({ ...filters, [key]: value })
+  const handleClearFilters = () => onFiltersChange({ status: 'All', flagged: 'All' })
 
   const activeFilterCount = (filters.status !== 'All' ? 1 : 0) + (filters.flagged !== 'All' ? 1 : 0)
 
   // Apply filters
   const visibleStudents = students.filter(s => {
-    if (filters.status !== 'All' && s.status !== filters.status) return false
     const isFlagged = s.is_incomplete || s.is_invalid
+    if (filters.status === 'Active')       { if (!qualifies(s, minTotal)) return false }
+    else if (filters.status === 'Debarred')     { if (s.status !== 'Debarred') return false }
+    else if (filters.status === 'NotQualified') { if (s.status === 'Debarred' || qualifies(s, minTotal)) return false }
     if (filters.flagged === 'Yes' && !isFlagged) return false
     if (filters.flagged === 'No'  &&  isFlagged) return false
     return true
@@ -168,7 +172,7 @@ export default function StudentTable({ students, minTotal, onToggle }) {
   ]
 
   return (
-    <div className="card p-0 overflow-hidden" id="student-table">
+    <div className="card p-0" id="student-table">
 
       {/* Card header */}
       <div className="px-6 py-4 border-b border-surface-300 flex items-center justify-between">
@@ -182,7 +186,7 @@ export default function StudentTable({ students, minTotal, onToggle }) {
           {/* Active filter pills */}
           {filters.status !== 'All' && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand-50 border border-brand-200 text-[10px] font-bold text-brand-600">
-              {filters.status}
+              {{ Active: 'Qualified', NotQualified: 'Not Qualified', Debarred: 'Debarred' }[filters.status] ?? filters.status}
               <button onClick={() => handleFilterChange('status', 'All')} className="hover:text-brand-800">✕</button>
             </span>
           )}
@@ -209,7 +213,7 @@ export default function StudentTable({ students, minTotal, onToggle }) {
         </div>
       </div>
 
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto overflow-hidden rounded-b-2xl">
         <table className="w-full" aria-label="Student data table">
           <thead className="bg-surface-200/70">
             <tr>
@@ -284,14 +288,18 @@ export default function StudentTable({ students, minTotal, onToggle }) {
                       </span>
                     </td>
 
-                    {/* Status badge */}
-                    <td className="table-cell">
-                      {isDebarred ? (
-                        <span className="badge-debarred">Debarred</span>
-                      ) : (
-                        <span className="badge-qualified">Qualified</span>
-                      )}
-                    </td>
+                    {/* Status badge — reflects real qualification state */}
+                  <td className="table-cell">
+                    {isDebarred ? (
+                      <span className="badge-debarred">Debarred</span>
+                    ) : isQualifying ? (
+                      <span className="badge-qualified">Qualified</span>
+                    ) : (
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-slate-100 text-slate-400 border border-slate-200">
+                        Not Qualified
+                      </span>
+                    )}
+                  </td>
 
                     {/* Flagged */}
                     <td className="table-cell">

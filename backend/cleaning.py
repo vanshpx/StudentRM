@@ -218,6 +218,12 @@ def run_cleaning_pipeline(df_raw: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
         ).sum()
     )
 
+    # Flag grades where the normalized value contains no digit at all
+    # e.g. "Pass", "A+", "Senior" — these cannot be matched to a class year.
+    has_grade = df["grade"].notna() & (df["grade"].astype(str).str.strip() != "")
+    invalid_grade_mask = has_grade & ~df["grade"].astype(str).str.contains(r"\d", regex=True, na=False)
+    df.loc[invalid_grade_mask, "is_invalid"] = True
+
     # Score columns — extract numeric part (e.g. "24 marks" → 24.0)
     # This must run on the raw (string) values before any to_numeric cast.
     for col in ["math", "science", "english"]:
@@ -278,6 +284,11 @@ def run_cleaning_pipeline(df_raw: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
         .str.strip()        # strip any whitespace left after quote removal
         .str.title()
     )
+
+    # Flag names that contain no alphabetic character — e.g. "12345", "@#$%".
+    # A valid student name must contain at least one letter.
+    invalid_name_mask = has_name & ~df.loc[has_name, "name"].astype(str).str.contains(r"[a-zA-Z]", regex=True, na=False)
+    df.loc[invalid_name_mask, "is_invalid"] = True
 
     # Tally summary counters
     incomplete_rows = int(df["is_incomplete"].sum())

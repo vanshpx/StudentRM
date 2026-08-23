@@ -133,7 +133,7 @@ Extracts the numeric part using `re.search(r'\d+', ...)`:
 | `Std 11` | `11` |
 | `Class 9` | `9` |
 
-If no digit is found, the original trimmed value is kept as-is.
+If no digit is found, the original trimmed value is kept as-is — and the row is flagged **`is_invalid = True`** (a grade of `"Pass"` or `"A+"` cannot be matched to a class year).
 
 ---
 
@@ -175,7 +175,14 @@ Applies to `Math`, `Science`, and `English`. Any cell whose cleaned value differ
 
 ---
 
-> **Flagged rows** (`is_incomplete` or `is_invalid`) are stored in the database and displayed in the table with visual dimming. They are excluded from the "Students Qualify" count, the average total, and all CSV exports.
+### Step 9 — Flag Invalid Names
+- After title-casing, any `Name` that contains **no alphabetic character** → `is_invalid = True`
+- Catches purely numeric names (`"12345"`), symbol-only values (`"@#$%"`), or data-entry errors
+- A valid name must contain at least one letter
+
+---
+
+> **Flagged rows** (`is_incomplete` or `is_invalid`) are stored in the database and displayed in the table with visual dimming. They are excluded from the "Students Qualify" count, the average total, and all CSV exports by default.
 
 ---
 
@@ -189,13 +196,19 @@ Applies to `Math`, `Science`, and `English`. Any cell whose cleaned value differ
 - **Append mode** — merges new CSV with existing records and re-runs the full pipeline (cross-file deduplication included)
 
 ### Live Score Filter
-- Slider controls the minimum total score threshold
-- Qualifying count and average update instantly client-side — no network call, no button press
+- Manual number input — type any value to set the minimum total score threshold
+- The ceiling is **dynamic**: automatically set to the highest valid total in the current dataset (e.g. if the max total is 253, the range shows 0–253)
+- Qualifying count and average update instantly client-side via `useDeferredValue` — no network call, no button press
 
 ### Student Table
 - All students displayed with full columns: Name, Gender, Grade, Math, Science, English, Total, Status, Flagged, Action
 - Flagged rows (incomplete / invalid scores) are visually dimmed
-- **Filter by Status** (Active / Debarred) and **Flagged** (Yes / No) via the filter icon dropdown
+- **Status badge** reflects real qualification state:
+  - 🟢 **Qualified** — Active, not flagged, total ≥ min
+  - ⚫ **Not Qualified** — Active but flagged OR below threshold
+  - 🔴 **Debarred** — manually debarred
+- **Filter by Status**: All · Qualified · Not Qualified · Debarred
+- **Filter by Flagged**: All · Yes · No
 - Active filter count badge on the filter button; dismissible filter pills in the header
 
 ### Debar / Undebar Toggle
@@ -204,8 +217,16 @@ Applies to `Math`, `Science`, and `English`. Any cell whose cleaned value differ
 - On failure, state reverts automatically and a toast notification appears
 
 ### Export
-- "Export Shortlist" downloads a CSV of Active, non-flagged students above the score threshold
+- "Export Shortlist" downloads a CSV that **mirrors the current table filters exactly**
 - Export is always re-filtered server-side from SQLite — never trusts client state
+- Supported export modes:
+
+  | Status Filter | Exports |
+  |---|---|
+  | **Qualified** *(default)* | Active, non-flagged, total ≥ min |
+  | **Not Qualified** | Active, flagged OR total < min |
+  | **Debarred** | Debarred students, total ≥ min |
+  | **All** | All students, total ≥ min |
 
 ### Persistence
 - SQLite persists state across page refreshes and server restarts within the same running instance

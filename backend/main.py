@@ -174,13 +174,24 @@ def update_status(student_id: int, body: StatusUpdateRequest):
 
 
 @app.get("/api/export")
-def export_csv(min_total: float = 0.0):
+def export_csv(
+    min_total: float = 0.0,
+    status_filter: str = "Active",
+    flagged_filter: str = "No",
+):
     """
     Server-side filtered CSV export.
     Always re-queries SQLite — never trusts client state.
-    Returns Active students with total >= min_total.
+
+    status_filter:  'Active' | 'Debarred' | 'All'
+    flagged_filter: 'No'     | 'Yes'       | 'All'
     """
-    rows = store.get_export_students(min_total)
+    if status_filter not in ("Active", "Debarred", "NotQualified", "All"):
+        raise HTTPException(status_code=400, detail="status_filter must be 'Active', 'Debarred', 'NotQualified', or 'All'")
+    if flagged_filter not in ("No", "Yes", "All"):
+        raise HTTPException(status_code=400, detail="flagged_filter must be 'No', 'Yes', or 'All'")
+
+    rows = store.get_export_students(min_total, status_filter, flagged_filter)
 
     output = io.StringIO()
     writer = csv.DictWriter(

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useDeferredValue } from 'react'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import UploadZone from './components/UploadZone.jsx'
@@ -16,7 +16,12 @@ const studentQualifies = (s, minTotal) =>
 export default function App() {
   const [students, setStudents] = useState([])
   const [minTotal, setMinTotal] = useState(0)
+  // deferredMinTotal lets React batch the expensive table re-render at lower
+  // priority — stat boxes use minTotal directly and update instantly.
+  const deferredMinTotal = useDeferredValue(minTotal)
   const [cleaningReport, setCleaningReport] = useState(null)
+  // Table filter state — lifted here so ExportButton can read it
+  const [tableFilters, setTableFilters] = useState({ status: 'All', flagged: 'All' })
 
   // ── Hydrate from SQLite on page load / refresh ──────────────────────────
   useQuery({
@@ -93,11 +98,18 @@ export default function App() {
     [students]
   )
 
+  // Max possible total from the actual dataset — drives the ScoreFilterInput ceiling
+  const maxTotal = useMemo(
+    () => Math.ceil(Math.max(0, ...students.map(s => s.total ?? 0))),
+    [students]
+  )
+
   // ── Upload success handler ───────────────────────────────────────────────
   const handleUploadSuccess = ({ students: newStudents, cleaning_report }) => {
     setStudents(newStudents)
     setCleaningReport(cleaning_report)
     setMinTotal(0)
+    setTableFilters({ status: 'All', flagged: 'All' }) // reset filters on new upload
   }
 
   const hasData = students.length > 0
@@ -140,7 +152,7 @@ export default function App() {
                 Clear All
               </button>
             )}
-            <ExportButton minTotal={minTotal} />
+            <ExportButton minTotal={minTotal} filters={tableFilters} />
             {/* Profile avatar placeholder */}
             <div className="w-9 h-9 rounded-full bg-surface-300 border-2 border-surface-400 overflow-hidden flex-shrink-0 flex items-center justify-center">
               <svg className="w-5 h-5 text-slate-400" fill="currentColor" viewBox="0 0 24 24">
@@ -250,7 +262,7 @@ export default function App() {
 
           {/* ── Right: Score filter — always rendered, collapses gracefully ── */}
           <div className="w-full">
-            <ScoreFilterInput value={minTotal} onChange={setMinTotal} />
+            <ScoreFilterInput value={minTotal} onChange={setMinTotal} max={maxTotal} />
           </div>
 
         </div>
@@ -262,7 +274,13 @@ export default function App() {
 
         {/* ── Recent Candidates table ── */}
         {hasData ? (
-          <StudentTable students={students} minTotal={minTotal} onToggle={handleToggle} />
+          <StudentTable
+            students={students}
+            minTotal={deferredMinTotal}
+            onToggle={handleToggle}
+            filters={tableFilters}
+            onFiltersChange={setTableFilters}
+          />
         ) : (
           <div className="card text-center py-16">
             <div className="w-16 h-16 rounded-2xl bg-brand-50 border border-brand-200 flex items-center justify-center mx-auto mb-4">

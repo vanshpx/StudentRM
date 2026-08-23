@@ -185,26 +185,48 @@ def update_student_status(student_id: int, status: str) -> dict:
     return dict(row)
 
 
-def get_export_students(min_total: float) -> list[dict]:
+def get_export_students(min_total: float, status_filter: str = "Active", flagged_filter: str = "No") -> list[dict]:
     """
-    Return Active, clean students whose total >= min_total, for CSV export.
-    Excludes:
-      - is_incomplete rows (missing name or any score — no valid Total)
-      - is_invalid rows (any score > 100 — data integrity concern)
-    Server is authoritative for the export — never trust client state.
+    Return students for CSV export, respecting the active table filters.
+
+    status_filter:  'Active' | 'Debarred' | 'NotQualified' | 'All'
+    flagged_filter: 'No'     | 'Yes'       | 'All'
+
+    NotQualified = Active students who are flagged OR have total < min_total.
+    All condition strings are hardcoded; only values go through params.
     """
+    if status_filter == "NotQualified":
+        # Active students who don't qualify: flagged OR below threshold
+        conditions = [
+            "status = 'Active'",
+            "(is_incomplete = 1 OR is_invalid = 1 OR (total IS NOT NULL AND total < ?))",
+        ]
+        params: list = [min_total]
+    else:
+        conditions = ["total >= ?"]
+        params = [min_total]
+
+        if status_filter in ("Active", "Debarred"):
+            conditions.append("status = ?")
+            params.append(status_filter)
+        # 'All' → no status condition
+
+        if flagged_filter == "No":
+            conditions.append("is_incomplete = 0")
+            conditions.append("is_invalid = 0")
+        elif flagged_filter == "Yes":
+            conditions.append("(is_incomplete = 1 OR is_invalid = 1)")
+        # 'All' → no flagged condition
+
+    where = " AND ".join(conditions)
+    query = (
+        f"SELECT name, gender, grade, math, science, english, total, status "
+        f"FROM students WHERE {where} ORDER BY total DESC, name ASC"
+    )
+
     with _get_conn() as conn:
-        rows = conn.execute(
-            """
-            SELECT name, gender, grade, math, science, english, total, status
-            FROM students
-            WHERE status = 'Active'
-              AND is_incomplete = 0
-              AND is_invalid = 0
-              AND total >= ?
-            ORDER BY total DESC, name ASC
-            """,
-            (min_total,),
-        ).fetchall()
+        rows = conn.execute(query, params).fetchall()
     return [dict(r) for r in rows]
+
+
 
