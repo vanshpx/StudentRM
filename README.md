@@ -83,6 +83,24 @@ uvicorn backend.main:app --host 0.0.0.0 --port $PORT
 
 The backend serves `frontend/dist/` as static files — single origin, no CORS needed.
 
+### Docker (production)
+
+```bash
+# Build the image (compiles React + installs Python deps inside the container)
+docker build -t recruitment-manager .
+
+# Run — mounts a local ./data volume so SQLite persists across restarts
+docker run -d \
+  -p 8000:8000 \
+  -v $(pwd)/data:/app/data \
+  --name recruitment-manager \
+  recruitment-manager
+```
+
+App available at `http://localhost:8000`.
+
+> **Persist SQLite across container recreations:** the `-v $(pwd)/data:/app/data` flag mounts a local folder into the container. Without it, the database resets every time the container is recreated.
+
 ---
 
 ## Cleaning Pipeline

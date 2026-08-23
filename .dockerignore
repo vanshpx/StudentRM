@@ -1,0 +1,46 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# Frontend build artifacts and deps (rebuilt inside Docker)
+frontend/node_modules/
+frontend/dist/
+
+# SQLite data (mounted as volume in production)
+data/
+*.db
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Dev/IDE
+.vscode/
+.idea/
+.agents/
+documents/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Docker itself
+Dockerfile
+.dockerignore
+
+# Render artifacts (removed, but just in case)
+render.yaml
+build.sh
+build.py
+
+# Media / test files
+*.png
+*.jpg
+*.jpeg
+sample_data/
