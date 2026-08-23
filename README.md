@@ -2,7 +2,20 @@
 
 > Student eligibility shortlisting tool — upload raw CSVs, auto-clean, filter, manage exceptions, and export.
 
+🔗 **Live Demo:** [https://studentrm-3.onrender.com](https://studentrm-3.onrender.com)
+
 ---
+
+## UI
+
+**Dashboard — Upload, Stats & Cleaning Summary**
+![Dashboard screenshot](docs/screenshots/ui-dashboard.png)
+
+**Student Table — Full Dataset with Filters & Debar Toggle**
+![Student table screenshot](docs/screenshots/ui-table.png)
+
+---
+
 ## Demo video
 
 https://github.com/user-attachments/assets/d47e3ac7-ef25-4717-a243-30627ad17d0b
@@ -79,7 +92,7 @@ npm run dev
 python -m pytest backend/tests/ -v
 ```
 
-### Production build
+### Production build (manual)
 
 ```bash
 cd frontend && npm run build
@@ -88,7 +101,7 @@ uvicorn backend.main:app --host 0.0.0.0 --port $PORT
 
 The backend serves `frontend/dist/` as static files — single origin, no CORS needed.
 
-### Docker (production)
+### Docker (local)
 
 ```bash
 # Build the image (compiles React + installs Python deps inside the container)
@@ -105,6 +118,20 @@ docker run -d \
 App available at `http://localhost:8000`.
 
 > **Persist SQLite across container recreations:** the `-v $(pwd)/data:/app/data` flag mounts a local folder into the container. Without it, the database resets every time the container is recreated.
+
+### Deployment — Render (Docker)
+
+This app is deployed to **Render** as a Docker Web Service.
+
+🔗 **Live URL:** [https://studentrm-3.onrender.com](https://studentrm-3.onrender.com)
+
+Render automatically builds and runs the `Dockerfile` on every push to the main branch. No manual build steps are needed — Render handles the full build and deploy pipeline.
+
+> **⚠️ Ephemeral Filesystem on Render Free Tier**
+>
+> Render's free-tier instances use an **ephemeral filesystem**. SQLite provides real persistence during the demo and between page refreshes within the same running instance. However, **a fresh Render deploy (or a service restart) resets the database** — all uploaded student data is lost.
+>
+> This is a documented trade-off of the free tier, not a bug. For persistent storage across deploys, attach a Render Disk (paid) or migrate to an external database.
 
 ---
 
