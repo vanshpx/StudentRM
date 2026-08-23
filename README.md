@@ -9,10 +9,12 @@
 ## UI
 
 **Dashboard — Upload, Stats & Cleaning Summary**
-![Dashboard screenshot](docs/screenshots/ui-dashboard.png)
+![Dashboard screenshot](<img width="1906" height="911" alt="Screenshot 2026-08-24 033915" src="https://github.com/user-attachments/assets/fa514a30-4225-4c18-994a-7c272bb3ff75" />
+)
 
 **Student Table — Full Dataset with Filters & Debar Toggle**
-![Student table screenshot](docs/screenshots/ui-table.png)
+![Student table screenshot](<img width="1906" height="912" alt="Screenshot 2026-08-24 033935" src="https://github.com/user-attachments/assets/322876fd-d528-46f3-83a4-ce14b8f1eb1c" />
+)
 
 ---
 
